@@ -9,6 +9,14 @@ class DatabaseManager:
     def getConnection(self):
         return sqlite3.connect(self.db_path)
 
+    def userExists(self, username):
+        conn = self.getConnection()
+        cursor = conn.cursor()
+        cursor.execute('''SELECT 1 FROM Jucatori WHERE Username = ?''', (username,))
+        row = cursor.fetchone()
+        conn.close()
+        return row is not None
+
     def createTables(self):
         conn = self.getConnection()
         cursor = conn.cursor()
@@ -85,13 +93,11 @@ class DatabaseManager:
         conn = self.getConnection()
         cursor = conn.cursor()
 
-        # p1 și p2 sunt numele sortate alfabetic!
         p1, p2 = sorted([player1, player2])
 
         cursor.execute("SELECT * FROM IstoricMeciuri WHERE Jucator1 = ? AND Jucator2 = ?", (p1, p2))
         meci = cursor.fetchone()
 
-        # AICI ERA GREȘEALA: Trebuie să comparăm cu p1 și p2!
         v1_add = 1 if winner == p1 else 0
         v2_add = 1 if winner == p2 else 0
         rem_add = 1 if winner == "Remiza" else 0
@@ -102,7 +108,6 @@ class DatabaseManager:
                            VALUES(?, ?, ?, ?, ?)''',
                            (p1, p2, v1_add, v2_add, rem_add))
         else:
-            # ȘI AICI: Folosim p1 și p2!
             if winner == p1:
                 cursor.execute('''UPDATE IstoricMeciuri SET VictoriiJ1 = VictoriiJ1 + 1
                                WHERE Jucator1 = ? AND Jucator2 = ?''', (p1, p2))

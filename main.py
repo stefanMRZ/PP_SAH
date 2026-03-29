@@ -1,16 +1,28 @@
-# This is a sample Python script.
+import sys
+from PyQt5.QtWidgets import QApplication
+from databaseManager import DatabaseManager
+from guiWindows import LoginWindow, RegisterWindow
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+def main():
+    # 1. Inițializăm aplicația PyQt5
+    app = QApplication(sys.argv)
 
+    # 2. Pornim conexiunea la baza de date
+    db = DatabaseManager()
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+    # 3. Instanțiem ferestrele de start
+    login_win = LoginWindow(db)
+    register_win = RegisterWindow(db)
 
+    # 4. Le conectăm între ele pentru a putea naviga înainte și înapoi
+    login_win.register_window = register_win
+    register_win.loginWindow = login_win
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+    # 5. Afișăm prima fereastră
+    login_win.show()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    # 6. Menținem aplicația deschisă până când dăm X
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()

@@ -73,6 +73,9 @@ class LoginWindow(BaseWindow):
 
         if self.dbManager.loginUser(user, passwd):
             self.showMessage("Succes","Autentificare realizata cu succes!")
+            self.lobby_window = LobbyWindow(self.dbManager, user)
+            self.hide()
+            self.lobby_window.show()
         else:
             self.showMessage("Eroare","Username sau parola gresita, inregistrati utilizatorul...", isError=True)
             self.go_to_register()
@@ -134,19 +137,52 @@ class RegisterWindow(BaseWindow):
             self.hide()
             self.loginWindow.show()
 
+class LobbyWindow(BaseWindow):
+    def __init__(self, dbManager, username):
+        super().__init__(title="Lobby - Sah Player2Player", width=900, height=750)
+        self.dbManager = dbManager
+        self.setupUi()
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    def setupUi(self):
+        layout = QVBoxLayout()
 
-    db = DatabaseManager()
+        self.label = QLabel("Conectare realizata. Alege actiune")
 
-    login_win = LoginWindow(db)
-    register_win = RegisterWindow(db)
+        self.input_search_user = QLineEdit()
+        self.input_search_user.setPlaceholderText("Nume Utilizator")
 
-    login_win.register_window = register_win
-    # Corectat aici: loginWindow (cu W mare) in loc de login_window
-    register_win.loginWindow = login_win
+        self.label_search = QLabel("Cauta scorul unui jucator:")
+        self.btn_search = QPushButton("Interogare Scor")
+        self.btn_search.clicked.connect(self.handleInterogare)
 
-    login_win.show()
+        self.label_search_result = QLabel("")
 
-    sys.exit(app.exec_())
+        layout.addWidget(self.label_search)
+        layout.addWidget(self.input_search_user)
+        layout.addWidget(self.btn_search)
+        layout.addWidget(self.label_search_result)
+
+        self.btn_search_opponent = QPushButton("Cauta Oponent")
+        self.btn_search_opponent.clicked.connect(self.cautaOponent)
+        layout.addWidget(self.btn_search_opponent)
+
+        self.setLayout(layout)
+
+    def handleInterogare(self):
+        user = self.input_search_user.text()
+        if not user:
+            self.showMessage("Eroare","Introdu un nume de utilizator!", isError=True)
+            return
+        if not self.dbManager.userExists(user):
+            self.showMessage("Eroare", "Utilizator inexistent!")
+            return
+        else:
+            scor = self.dbManager.getPlayerScore(user)
+            self.label_search_result.setText(f"Jucatorul '{user}' are {scor} puncte.")
+
+    def cautaOponent(self):
+        self.btn_search_opponent.setEnabled(False)
+        self.btn_search_opponent.setText("Se cauta oponent...")
+        self.showMessage("Asteptare","Am intrat in coada de asteptare")
+
+        #ipcMANAGER
