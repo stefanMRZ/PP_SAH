@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox, QDesktopWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QGridLayout, QSizePolicy
 from databaseManager import DatabaseManager
 from ipcManager import ipcManager
+from chessLogic import Board
 
 class BaseWindow(QWidget):
     def __init__(self, title = "Sah Player2Player", width = 900, height = 750):
@@ -204,7 +205,15 @@ class ChessWindow(BaseWindow):
         self.player = player
         self.ipc_manager = ipc_manager
 
+        self.logic_board = Board()
+        self.piece_symbols = {
+            "wR": "♖", "wN": "♘", "wB": "♗", "wQ": "♕", "wK": "♔", "wP": "♙",
+            "bR": "♖", "bN": "♘", "bB": "♗", "bQ": "♕", "bK": "♔", "bP": "♙",
+            "": ""
+        }
+
         super().__init__(title=f"Sah Player2Player - Jucator: {self.player}", width=800, height=800)
+        self.setFixedSize(800, 800)
         self.buttons = [[None for _ in range(8)] for _ in range(8)]
 
         self.setupUi()
@@ -212,26 +221,70 @@ class ChessWindow(BaseWindow):
     def setupUi(self):
         self.grid_layout = QGridLayout()
         self.grid_layout.setSpacing(0)
+
         self.drawBoardUI()
+        self.updateBoardUI()
 
         self.setLayout(self.grid_layout)
 
     def drawBoardUI(self):
+        base_style = "border: none; font-size: 80px; font-family: 'DejaVu Sans'; outline: none;"
         for row in range(8):
             for col in range(8):
                 btn = QPushButton()
                 btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+                btn.setMinimumSize(1, 1)
 
                 if (row + col) % 2 == 0:
-                    btn.setStyleSheet("background-color: #779556; border: none;")
+                    btn.setStyleSheet(f"background-color: #2D3E50; {base_style}")
                 else:
-                    btn.setStyleSheet("background-color: #EBECD0; border: none;")
+                    btn.setStyleSheet(f"background-color: #D5D8DC; {base_style}")
 
                 btn.clicked.connect(lambda checked, r=row, c=col: self.onSquareClicked(r, c))
 
                 self.grid_layout.addWidget(btn, row, col)
                 self.buttons[row][col] = btn
 
+    def updateBoardUI(self):
+        for row in range(8):
+            for col in range(8):
+                piesa = self.logic_board.getPiece(row, col)
+                simbol = self.piece_symbols.get(piesa, "")
+                btn = self.buttons[row][col]
+
+                btn.setText(simbol)
+
+                if piesa.startswith("w"):
+                    btn.setStyleSheet(btn.styleSheet() + " color: #FFFFFF;")
+                elif piesa.startswith("b"):
+                    btn.setStyleSheet(btn.styleSheet() + " color: #000000;")
+
     def onSquareClicked(self, row, col):
         print(f"Ai dat click pe campul: rand {row}, coloana {col}")
 
+
+if __name__ == "__main__":
+    # O scurtă zonă de testare direct în acest fișier
+    app = QApplication(sys.argv)
+
+
+    # Simulam o instantiere cu o baza de date goala
+    # In main.py vei folosi DatabaseManager() si flow-ul complet
+    class MockDB:
+        def loginUser(self, user, passwd): return True
+
+        def registerUser(self, user, passwd): return True
+
+        def userExists(self, user): return True
+
+        def getPlayerScore(self, user): return 0
+
+
+    mock_db = MockDB()
+    login_win = LoginWindow(mock_db)
+    register_win = RegisterWindow(mock_db)
+    login_win.register_window = register_win
+    register_win.loginWindow = login_win
+
+    login_win.show()
+    sys.exit(app.exec_())
