@@ -1,6 +1,7 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox, QDesktopWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton
+from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox, QDesktopWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QGridLayout, QSizePolicy
 from databaseManager import DatabaseManager
+from ipcManager import ipcManager
 
 class BaseWindow(QWidget):
     def __init__(self, title = "Sah Player2Player", width = 900, height = 750):
@@ -141,6 +142,7 @@ class LobbyWindow(BaseWindow):
     def __init__(self, dbManager, username):
         super().__init__(title="Lobby - Sah Player2Player", width=900, height=750)
         self.dbManager = dbManager
+        self.username = username
         self.setupUi()
 
     def setupUi(self):
@@ -183,6 +185,53 @@ class LobbyWindow(BaseWindow):
     def cautaOponent(self):
         self.btn_search_opponent.setEnabled(False)
         self.btn_search_opponent.setText("Se cauta oponent...")
-        self.showMessage("Asteptare","Am intrat in coada de asteptare")
 
-        #ipcMANAGER
+        ipc = ipcManager()
+        if ipc.connectCreate():
+            self.showMessage("Gata de partida","Conectare realizata cu succes. Incepem meciul")
+
+            self.chess_window = ChessWindow(self.dbManager, self.username, ipc)
+            self.hide()
+            self.chess_window.show()
+        else:
+            self.showMessage("Eroare", "Nu s-a putut realiza conexiunea de retea", isError=True)
+            self.btn_search_opponent.setEnabled(True)
+            self.btn_search_opponent.setText("Se cauta oponent...")
+
+class ChessWindow(BaseWindow):
+    def __init__(self, dbManager, player, ipc_manager = None):
+        self.dbManager = dbManager
+        self.player = player
+        self.ipc_manager = ipc_manager
+
+        super().__init__(title=f"Sah Player2Player - Jucator: {self.player}", width=800, height=800)
+        self.buttons = [[None for _ in range(8)] for _ in range(8)]
+
+        self.setupUi()
+
+    def setupUi(self):
+        self.grid_layout = QGridLayout()
+        self.grid_layout.setSpacing(0)
+        self.drawBoardUI()
+
+        self.setLayout(self.grid_layout)
+
+    def drawBoardUI(self):
+        for row in range(8):
+            for col in range(8):
+                btn = QPushButton()
+                btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+                if (row + col) % 2 == 0:
+                    btn.setStyleSheet("background-color: #779556; border: none;")
+                else:
+                    btn.setStyleSheet("background-color: #EBECD0; border: none;")
+
+                btn.clicked.connect(lambda checked, r=row, c=col: self.onSquareClicked(r, c))
+
+                self.grid_layout.addWidget(btn, row, col)
+                self.buttons[row][col] = btn
+
+    def onSquareClicked(self, row, col):
+        print(f"Ai dat click pe campul: rand {row}, coloana {col}")
+
