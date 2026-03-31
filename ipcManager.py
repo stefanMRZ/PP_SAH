@@ -29,6 +29,8 @@ class ipcManager:
                 return mesaj_decodat
             except sysv_ipc.BusyError:
                 return None
+            except sysv_ipc.ExistentialError:
+                return None
         return None
 
     def destroyQueue(self):

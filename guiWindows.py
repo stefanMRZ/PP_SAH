@@ -1,7 +1,7 @@
 import sys
 
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox, QDesktopWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QGridLayout, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox, QDesktopWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QGridLayout, QSizePolicy, QInputDialog
 from databaseManager import DatabaseManager
 from ipcManager import ipcManager
 from chessLogic import Board
@@ -144,7 +144,7 @@ class RegisterWindow(BaseWindow):
 
 class LobbyWindow(BaseWindow):
     def __init__(self, dbManager, username):
-        super().__init__(title="Lobby - Sah Player2Player", width=900, height=750)
+        super().__init__(title=f"Lobby - {username}", width=900, height=750)
         self.dbManager = dbManager
         self.username = username
         self.adversar = None
@@ -220,11 +220,12 @@ class LobbyWindow(BaseWindow):
 
     def pornesteJocul(self, culoare, adversar):
         self.chess_window = ChessWindow(self.dbManager, self.username, self.ipc, culoare, adversar)
-        self.hide()
+        self.close()
         self.chess_window.show()
 
 class ChessWindow(BaseWindow):
     def __init__(self, dbManager, player, ipc_manager, assigned_color, adversar):
+        self.fereastra_lobby = None
         self.selected_square = None
         self.adversar = adversar
         self.dbManager = dbManager
@@ -275,8 +276,24 @@ class ChessWindow(BaseWindow):
                 self.logic_board.board[new_r][new_c] = piesa
                 self.logic_board.board[old_r][old_c] = ""
 
+                self.logic_board.proceseazaRocada(piesa, old_r, old_c, new_r, new_c)
+
                 self.turn = "b" if self.turn == "w" else "w"
                 self.updateBoardUI()
+
+                if self.logic_board.esteMat(self.assigned_color):
+                    self.timer.stop()
+                    self.showMessage("Sah MAT",f"Ai pierdut acest meci\n{self.adversar} este BIRUITOR", isError=True)
+                    self.dbManager.updateResult(self.player, self.adversar, self.adversar)
+                    self.intoarceLobby()
+                elif self.logic_board.estePat(self.assigned_color):
+                    self.timer.stop()
+                    self.showMessage("SAH PAT", f"Ai avut un meci remarcabil cu {self.adversar} din care nimeni n-a iesit invingator", isError=True)
+                    self.dbManager.updateResult(self.player, self.adversar, "Remiza")
+                    self.intoarceLobby()
+
+
+
                 print(f"Adversarul a mutat de la {old_r},{old_c} la {new_r},{new_c}")
             except Exception as e:
                 print(f"Eroare la procesare mesaj IPC: {e}")
@@ -369,7 +386,7 @@ class ChessWindow(BaseWindow):
             self.logic_board.board[row][col] = piesa_de_mutat
             self.logic_board.board[old_row][old_col] = ""
 
-            # verific daca nu am intrat in sah dupa mutare
+            # verific daca am intrat in sah dupa mutare
             if self.logic_board.esteSah(self.assigned_color):
                 # facem undo
                 self.logic_board.board[row][col] = piesa_destinatie
@@ -384,6 +401,7 @@ class ChessWindow(BaseWindow):
 
             self.logic_board.board[row][col] = piesa_de_mutat
             self.logic_board.board[old_row][old_col] = ""
+            self.logic_board.proceseazaRocada(piesa_de_mutat, old_row, old_col, row, col)
 
             if self.ipc_manager:
                 tip = 1 if self.assigned_color == "w" else 2
@@ -393,30 +411,27 @@ class ChessWindow(BaseWindow):
             self.turn = "b" if self.turn == "w" else "w"
 
             self.updateBoardUI()
+
+            culoare_adversar = "b" if self.assigned_color == "w" else "w"
+            if self.logic_board.esteMat(culoare_adversar):
+                self.timer.stop()
+                self.showMessage("SAH MAT!", f"Felicitari! L-ai distrus pe {self.adversar}!")
+                self.dbManager.updateResult(self.player, self.adversar, self.player)
+                self.intoarceLobby()
+            elif self.logic_board.estePat(culoare_adversar):
+                self.timer.stop()
+                self.showMessage("SAH PAT",f"Ai avut un meci remarcabil cu {self.adversar} din care nimeni n-a iesit invingator",isError=True)
+                self.dbManager.updateResult(self.player, self.adversar, "Remiza")
+                self.intoarceLobby()
+
             print(f"Mutat la {row},{col}. Acum e randul: {self.turn}")
 
-if __name__ == "__main__":
-    # O scurtă zonă de testare direct în acest fișier
-    app = QApplication(sys.argv)
+    def intoarceLobby(self):
+        if self.ipc_manager:
+            self.ipc_manager.destroyQueue()
+
+        self.fereastra_lobby = LobbyWindow(self.dbManager, self.player)
+        self.fereastra_lobby.show()
+        self.close()
 
 
-    # Simulam o instantiere cu o baza de date goala
-    # In main.py vei folosi DatabaseManager() si flow-ul complet
-    class MockDB:
-        def loginUser(self, user, passwd): return True
-
-        def registerUser(self, user, passwd): return True
-
-        def userExists(self, user): return True
-
-        def getPlayerScore(self, user): return 0
-
-
-    mock_db = MockDB()
-    login_win = LoginWindow(mock_db)
-    register_win = RegisterWindow(mock_db)
-    login_win.register_window = register_win
-    register_win.loginWindow = login_win
-
-    login_win.show()
-    sys.exit(app.exec_())

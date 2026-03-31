@@ -14,6 +14,14 @@ class Board:
         return self.board[row][col]
 
     def esteMutareValida(self, rand_init, col_init, rand_final, col_final):
+        if rand_init == rand_final and col_init == col_final:
+            return False
+
+        culoare_piesa = self.board[rand_init][col_init][0]
+        piesa_destinatie = self.board[rand_final][col_final]
+        if piesa_destinatie != "" and piesa_destinatie.startswith(culoare_piesa):
+            return False
+
         piesa = self.board[rand_init][col_init][1]
         culoare_piesa = self.board[rand_init][col_init][0]
 
@@ -92,13 +100,9 @@ class Board:
                     if rand_final == 7:
                         # ROCADA MARE
                         if col_final == 2 and len(self.board[7][0]) > 1 and self.board[7][0][1] == "R":
-                            self.board[7][3] = self.board[7][0]
-                            self.board[7][0] = ""
                             return True
                         # ROCADA MICA
                         elif col_final == 6 and len(self.board[7][7]) > 1 and self.board[7][7][1] == "R":
-                            self.board[7][5] = self.board[7][7]
-                            self.board[7][7] = ""
                             return True
                     return False
                 return False
@@ -109,13 +113,9 @@ class Board:
                     if rand_final == 0:
                         # ROCADA MARE
                         if col_final == 2 and len(self.board[0][0]) > 1 and self.board[0][0][1] == "R":
-                            self.board[0][3] = self.board[0][0]
-                            self.board[0][0] = ""
                             return True
                         # ROCADA MICA
                         elif col_final == 6 and len(self.board[0][7]) > 1 and self.board[0][7][1] == "R":
-                            self.board[0][5] = self.board[0][7]
-                            self.board[0][7] = ""
                             return True
                     return False
                 return False
@@ -155,10 +155,10 @@ class Board:
             for j in range(8):
                 if self.board[i][j] == f"{culoare}K":
                     return i,j
+        return -1, -1
 
     def esteSah(self, culoare):
         rand_rege, col_rege = self.getKingPos(culoare)
-
         for i in range(8):
             for j in range(8):
                 piesa = self.board[i][j]
@@ -167,3 +167,43 @@ class Board:
                         return True
         return False
 
+    def faraMutariValide(self, culoare):
+        # parcurg toate mutarile posibile de pe tabla
+        for rand_init in range(8):
+            for col_init in range(8):
+                piesa = self.board[rand_init][col_init]
+
+                if piesa != "" and piesa.startswith(culoare):
+                    for rand_final in range(8):
+                        for col_final in range(8):
+                            if self.esteMutareValida(rand_init, col_init, rand_final, col_final):
+                                piesa_destinatie = self.board[rand_final][col_final]
+
+                                self.board[rand_final][col_final] = piesa
+                                self.board[rand_init][col_init] = ""
+
+                                totSah = self.esteSah(culoare)
+
+                                self.board[rand_final][col_final] = piesa_destinatie
+                                self.board[rand_init][col_init] = piesa
+
+                                if not totSah:
+                                    return False
+        return True
+
+    def esteMat(self, culoare):
+        return self.esteSah(culoare) and self.faraMutariValide(culoare)
+
+    def estePat(self, culoare):
+        return (not self.esteSah(culoare)) and self.faraMutariValide(culoare)
+
+    def proceseazaRocada(self, piesa, rand_init, col_init, rand_final, col_final):
+        if piesa.endswith("K") and abs(col_final - col_init) == 2:
+            if col_final == 6:
+                # Rocada Mica
+                self.board[rand_final][5] = self.board[rand_final][7]
+                self.board[rand_final][7] = ""
+            elif col_final == 2:
+                # Rocada Mare
+                self.board[rand_final][3] = self.board[rand_final][0]
+                self.board[rand_final][0] = ""
