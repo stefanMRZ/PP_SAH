@@ -269,14 +269,20 @@ class ChessWindow(BaseWindow):
         mesaj = self.ipc_manager.receiveMessage(msg_type=tip)
         if mesaj:
             try:
-                coords = list(map(int, mesaj.split(",")))
-                old_r, old_c, new_r, new_c = coords
+                parti = mesaj.split(",")
+                old_r, old_c, new_r, new_c = map(int, parti[:4])
 
                 piesa = self.logic_board.board[old_r][old_c]
                 self.logic_board.board[new_r][new_c] = piesa
                 self.logic_board.board[old_r][old_c] = ""
 
                 self.logic_board.proceseazaRocada(piesa, old_r, old_c, new_r, new_c)
+
+                # verificare promovare pion
+                if len(parti) == 5:
+                    litera_promovare = parti[4]
+                    culoare_adv = piesa[0]
+                    self.logic_board.board[new_r][new_c] = culoare_adv + litera_promovare
 
                 self.turn = "b" if self.turn == "w" else "w"
                 self.updateBoardUI()
@@ -401,11 +407,16 @@ class ChessWindow(BaseWindow):
 
             self.logic_board.board[row][col] = piesa_de_mutat
             self.logic_board.board[old_row][old_col] = ""
+
             self.logic_board.proceseazaRocada(piesa_de_mutat, old_row, old_col, row, col)
+            litera_promovare = self.verificaPromovarePion(row, col, piesa_de_mutat)
 
             if self.ipc_manager:
                 tip = 1 if self.assigned_color == "w" else 2
                 mesaj_mutare = f"{old_row},{old_col},{row},{col}"
+
+                if litera_promovare != "":
+                    mesaj_mutare += f",{litera_promovare}"
                 self.ipc_manager.sendMessage(mesaj_mutare, tip)
 
             self.turn = "b" if self.turn == "w" else "w"
@@ -425,6 +436,31 @@ class ChessWindow(BaseWindow):
                 self.intoarceLobby()
 
             print(f"Mutat la {row},{col}. Acum e randul: {self.turn}")
+
+    def verificaPromovarePion(self, row, col, piesa):
+        if piesa[1] != "P":
+            return ""
+
+        if (self.assigned_color == "w" and row == 0) or (self.assigned_color == "b" and row == 7):
+            optiuni = ["Regina", "Tura", "Nebun", "Cal"]
+            alegere, ok = QInputDialog.getItem(self, "Promovare Pion", "Alege piesa pentru promovare:", optiuni, 0,False)
+
+            litera_promovare = "Q"
+            if ok and alegere:
+                if alegere == "Regina":
+                    litera_promovare = "Q"
+                elif alegere == "Tura":
+                    litera_promovare = "R"
+                elif alegere == "Nebun":
+                    litera_promovare = "B"
+                elif alegere == "Cal":
+                    litera_promovare = "N"
+
+            piesa_noua = self.assigned_color + litera_promovare
+            self.logic_board.board[row][col] = piesa_noua
+
+            return litera_promovare
+        return ""
 
     def intoarceLobby(self):
         if self.ipc_manager:

@@ -197,6 +197,8 @@ class Board:
     def estePat(self, culoare):
         return (not self.esteSah(culoare)) and self.faraMutariValide(culoare)
 
+
+
     def proceseazaRocada(self, piesa, rand_init, col_init, rand_final, col_final):
         if piesa.endswith("K") and abs(col_final - col_init) == 2:
             if col_final == 6:
