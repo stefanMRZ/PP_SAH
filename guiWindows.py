@@ -345,7 +345,7 @@ class ChessWindow(BaseWindow):
             old_row, old_col = self.selected_square
             self.selected_square = None
 
-            if old_row == row and old_col == col:
+            if (old_row == row and old_col == col) or not self.logic_board.esteMutareValida(old_row, old_col, row, col):
                 self.updateBoardUI()
                 return
 
