@@ -1,4 +1,6 @@
 import sys
+
+from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QWidget, QMessageBox, QDesktopWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QGridLayout, QSizePolicy
 from databaseManager import DatabaseManager
 from ipcManager import ipcManager
@@ -53,6 +55,7 @@ class LoginWindow(BaseWindow):
 
         self.btn_login = QPushButton("Login")
         self.btn_login.clicked.connect(self.handleLogin)
+        self.input_password.returnPressed.connect(self.handleLogin)
 
         self.btn_go_register = QPushButton("Nu ai cont? Inregistreaza-te")
         self.btn_go_register.clicked.connect(self.go_to_register)
@@ -144,6 +147,10 @@ class LobbyWindow(BaseWindow):
         super().__init__(title="Lobby - Sah Player2Player", width=900, height=750)
         self.dbManager = dbManager
         self.username = username
+        self.adversar = None
+        self.ipc = None
+        self.match_timer = QTimer()
+        self.match_timer.timeout.connect(self.asteaptaNegru)
         self.setupUi()
 
     def setupUi(self):
@@ -187,23 +194,44 @@ class LobbyWindow(BaseWindow):
         self.btn_search_opponent.setEnabled(False)
         self.btn_search_opponent.setText("Se cauta oponent...")
 
-        ipc = ipcManager()
-        if ipc.connectCreate():
-            self.showMessage("Gata de partida","Conectare realizata cu succes. Incepem meciul")
-
-            self.chess_window = ChessWindow(self.dbManager, self.username, ipc)
-            self.hide()
-            self.chess_window.show()
+        self.ipc = ipcManager()
+        if self.ipc.connectCreate():
+            mesaj = self.ipc.receiveMessage(msg_type=1)
+            if mesaj and mesaj.startswith("Hello:"):
+                self.adversar = mesaj.split(":")[1]
+                self.ipc.sendMessage(f"Hai noroc:{self.username}", msg_type=2)
+                self.showMessage("Meci gasit!", "Te-ai conectat. Vei juca cu NEGRU.")
+                self.pornesteJocul("b", self.adversar)
+            else:
+                self.ipc.sendMessage(f"Hello:{self.username}", msg_type=1)
+                self.match_timer.start(500)
         else:
             self.showMessage("Eroare", "Nu s-a putut realiza conexiunea de retea", isError=True)
             self.btn_search_opponent.setEnabled(True)
             self.btn_search_opponent.setText("Se cauta oponent...")
 
+    def asteaptaNegru(self):
+        raspuns = self.ipc.receiveMessage(msg_type=2)
+        if raspuns and raspuns.startswith("Hai noroc:"):
+            self.adversar = raspuns.split(":")[1]
+            self.match_timer.stop()
+            self.showMessage("Meci gasit!", "Un adversar s-a conectat! Vei juca cu ALB.")
+            self.pornesteJocul("w",self.adversar)
+
+    def pornesteJocul(self, culoare, adversar):
+        self.chess_window = ChessWindow(self.dbManager, self.username, self.ipc, culoare, adversar)
+        self.hide()
+        self.chess_window.show()
+
 class ChessWindow(BaseWindow):
-    def __init__(self, dbManager, player, ipc_manager = None):
+    def __init__(self, dbManager, player, ipc_manager, assigned_color, adversar):
+        self.selected_square = None
+        self.adversar = adversar
         self.dbManager = dbManager
         self.player = player
         self.ipc_manager = ipc_manager
+        self.assigned_color = assigned_color
+        self.turn = "w"
 
         self.logic_board = Board()
         self.piece_symbols = {
@@ -212,11 +240,17 @@ class ChessWindow(BaseWindow):
             "": ""
         }
 
-        super().__init__(title=f"Sah Player2Player - Jucator: {self.player}", width=800, height=800)
+        scor_p1, scor_p2 = self.dbManager.getRivalScore(player, adversar)
+        titlu = f"{player}:        {scor_p1} - {scor_p2}        :{adversar}"
+        super().__init__(title=titlu, width=800, height=800)
         self.setFixedSize(800, 800)
         self.buttons = [[None for _ in range(8)] for _ in range(8)]
 
+
         self.setupUi()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.checkOppnentMove)
+        self.timer.start(500)
 
     def setupUi(self):
         self.grid_layout = QGridLayout()
@@ -227,6 +261,26 @@ class ChessWindow(BaseWindow):
 
         self.setLayout(self.grid_layout)
 
+    def checkOppnentMove(self):
+        if not self.ipc_manager:
+            return
+        tip = 2 if self.assigned_color == "w" else 1
+        mesaj = self.ipc_manager.receiveMessage(msg_type=tip)
+        if mesaj:
+            try:
+                coords = list(map(int, mesaj.split(",")))
+                old_r, old_c, new_r, new_c = coords
+
+                piesa = self.logic_board.board[old_r][old_c]
+                self.logic_board.board[new_r][new_c] = piesa
+                self.logic_board.board[old_r][old_c] = ""
+
+                self.turn = "b" if self.turn == "w" else "w"
+                self.updateBoardUI()
+                print(f"Adversarul a mutat de la {old_r},{old_c} la {new_r},{new_c}")
+            except Exception as e:
+                print(f"Eroare la procesare mesaj IPC: {e}")
+
     def drawBoardUI(self):
         base_style = "border: none; font-size: 80px; font-family: 'DejaVu Sans'; outline: none;"
         for row in range(8):
@@ -236,13 +290,20 @@ class ChessWindow(BaseWindow):
                 btn.setMinimumSize(1, 1)
 
                 if (row + col) % 2 == 0:
-                    btn.setStyleSheet(f"background-color: #2D3E50; {base_style}")
-                else:
                     btn.setStyleSheet(f"background-color: #D5D8DC; {base_style}")
+                else:
+                    btn.setStyleSheet(f"background-color: #2D3E50; {base_style}")
 
                 btn.clicked.connect(lambda checked, r=row, c=col: self.onSquareClicked(r, c))
 
-                self.grid_layout.addWidget(btn, row, col)
+                if self.assigned_color == "w":
+                    viz_row = row
+                    viz_col = col
+                else:
+                    viz_row = 7 - row
+                    viz_col = 7 - col
+
+                self.grid_layout.addWidget(btn, viz_row, viz_col)
                 self.buttons[row][col] = btn
 
     def updateBoardUI(self):
@@ -254,14 +315,61 @@ class ChessWindow(BaseWindow):
 
                 btn.setText(simbol)
 
+                if (row + col) % 2 == 0:
+                    color = "#D5D8DC"
+                else:
+                    color = "#2D3E50"
+
+                base_style = f"background-color: {color}; border: none; font-size: 80px; font-family: 'DejaVu Sans';"
                 if piesa.startswith("w"):
-                    btn.setStyleSheet(btn.styleSheet() + " color: #FFFFFF;")
+                    btn.setStyleSheet(base_style + " color: white;")
                 elif piesa.startswith("b"):
-                    btn.setStyleSheet(btn.styleSheet() + " color: #000000;")
+                    btn.setStyleSheet(base_style + " color: black;")
+                else:
+                    btn.setStyleSheet(base_style)
 
     def onSquareClicked(self, row, col):
-        print(f"Ai dat click pe campul: rand {row}, coloana {col}")
+        if self.turn != self.assigned_color:
+            print("Asteapta adversarul!")
+            return
 
+        piece = self.logic_board.getPiece(row, col)
+
+        if self.selected_square is None:
+            if piece != "" and piece.startswith(self.assigned_color):
+                self.selected_square = (row, col)
+                self.buttons[row][col].setStyleSheet(self.buttons[row][col].styleSheet() + "border: 3px solid yellow;")
+            return
+
+        else:
+            old_row, old_col = self.selected_square
+            self.selected_square = None
+
+            if old_row == row and old_col == col:
+                self.updateBoardUI()
+                return
+
+            if self.logic_board.board[row][col].startswith(self.assigned_color):
+                self.selected_square = (row, col)
+                self.updateBoardUI()
+                self.buttons[row][col].setStyleSheet(self.buttons[row][col].styleSheet() + "border: 4px solid yellow;")
+                return
+
+            piesa_de_mutat = self.logic_board.board[old_row][old_col]
+            print(f"DEBUG: Mut piesa '{piesa_de_mutat}' de la {old_row},{old_col} la {row},{col}")
+
+            self.logic_board.board[row][col] = piesa_de_mutat
+            self.logic_board.board[old_row][old_col] = ""
+
+            if self.ipc_manager:
+                tip = 1 if self.assigned_color == "w" else 2
+                mesaj_mutare = f"{old_row},{old_col},{row},{col}"
+                self.ipc_manager.sendMessage(mesaj_mutare, tip)
+
+            self.turn = "b" if self.turn == "w" else "w"
+
+            self.updateBoardUI()
+            print(f"Mutat la {row},{col}. Acum e randul: {self.turn}")
 
 if __name__ == "__main__":
     # O scurtă zonă de testare direct în acest fișier

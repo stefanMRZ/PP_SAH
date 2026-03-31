@@ -83,11 +83,15 @@ class DatabaseManager:
         row = cursor.fetchone()
         conn.close()
 
-        if row:
-            v1, v2, remize = row
-            return f"Scor: {p1}\t{v1 + 0.5 * remize} - {v2 + 0.5 * remize}\t{p2}"
-        else:
-            return f"Scor: {p1}\t0 - 0\t{p2}"
+        if row is None:
+            return 0,0
+        v1, v2, remize = row
+        scor_p1 = v1 + 0.5 * remize
+        scor_p2 = v2 + 0.5 * remize
+        if player1 != p1:
+            scor_p1, scor_p2 = scor_p2, scor_p1
+
+        return scor_p1, scor_p2
 
     def updateResult(self, player1, player2, winner):
         conn = self.getConnection()
