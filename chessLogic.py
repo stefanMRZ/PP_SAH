@@ -99,11 +99,19 @@ class Board:
                 if rand_init == 7 and col_init == 4:  # si n-a mai mutat regele si nu e in sah etc
                     if rand_final == 7:
                         # ROCADA MARE
-                        if col_final == 2 and len(self.board[7][0]) > 1 and self.board[7][0][1] == "R":
-                            return True
-                        # ROCADA MICA
-                        elif col_final == 6 and len(self.board[7][7]) > 1 and self.board[7][7][1] == "R":
-                            return True
+                        if col_final == 2 and self.board[7][0] == "wR":
+                            if self.board[7][1] == "" and self.board[7][2] == "" and self.board[7][3] == "":
+                                if (not self.estePatratAtacat(7, 4, "w") and
+                                        not self.estePatratAtacat(7, 3,"w") and not self.estePatratAtacat(
+                                        7, 2, "w")):
+                                    return True
+                            # ROCADA MICA
+                        elif col_final == 6 and self.board[7][7] == "wR":
+                            if self.board[7][5] == "" and self.board[7][6] == "":
+                                if (not self.estePatratAtacat(7, 4, "w") and
+                                        not self.estePatratAtacat(7, 5,"w") and not self.estePatratAtacat(
+                                        7, 6, "w")):
+                                    return True
                     return False
                 return False
 
@@ -112,11 +120,19 @@ class Board:
                 if rand_init == 0 and col_init == 4:  # si n-a mai mutat regele si nu e in sah etc
                     if rand_final == 0:
                         # ROCADA MARE
-                        if col_final == 2 and len(self.board[0][0]) > 1 and self.board[0][0][1] == "R":
-                            return True
-                        # ROCADA MICA
-                        elif col_final == 6 and len(self.board[0][7]) > 1 and self.board[0][7][1] == "R":
-                            return True
+                        if col_final == 2 and self.board[0][0] == "bR":
+                            if self.board[0][1] == "" and self.board[0][2] == "" and self.board[0][3] == "":
+                                if (not self.estePatratAtacat(0, 4, "b") and
+                                        not self.estePatratAtacat(0, 3,"b") and not self.estePatratAtacat(
+                                        0, 2, "b")):
+                                    return True
+                            # ROCADA MICA
+                        elif col_final == 6 and self.board[0][7] == "bR":
+                            if self.board[0][5] == "" and self.board[0][6] == "":
+                                if (not self.estePatratAtacat(0, 4, "b") and
+                                        not self.estePatratAtacat(0, 5,"b") and not self.estePatratAtacat(
+                                        0, 6, "b")):
+                                    return True
                     return False
                 return False
 
@@ -197,7 +213,20 @@ class Board:
     def estePat(self, culoare):
         return (not self.esteSah(culoare)) and self.faraMutariValide(culoare)
 
+    def estePatratAtacat(self, rand, col, culoare_aparator):
+        culoare_atacator = "b" if culoare_aparator == "w" else "w"
+        for i in range(8):
+            for j in range(8):
+                piesa = self.board[i][j]
 
+                if piesa != "" and piesa.startswith(culoare_atacator):
+                    if(piesa[1] == "K"):
+                        if abs(rand - i) <= 1 and abs(rand - j) <= 1:
+                            return True
+                        else:
+                            if self.esteMutareValida(i,j,rand,col):
+                                return True
+        return False
 
     def proceseazaRocada(self, piesa, rand_init, col_init, rand_final, col_final):
         if piesa.endswith("K") and abs(col_final - col_init) == 2:
