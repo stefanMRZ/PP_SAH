@@ -328,6 +328,13 @@ class ChessWindow(BaseWindow):
                 else:
                     btn.setStyleSheet(base_style)
 
+        # verific daca sunt in sah
+        if self.logic_board.esteSah(self.assigned_color):
+            rand_rege, col_rege = self.logic_board.getKingPos(self.assigned_color)
+            stil_curent = self.buttons[rand_rege][col_rege].styleSheet()
+            self.buttons[rand_rege][col_rege].setStyleSheet(stil_curent + "border: 5px solid red;")
+
+
     def onSquareClicked(self, row, col):
         if self.turn != self.assigned_color:
             print("Asteapta adversarul!")
@@ -355,7 +362,24 @@ class ChessWindow(BaseWindow):
                 self.buttons[row][col].setStyleSheet(self.buttons[row][col].styleSheet() + "border: 4px solid yellow;")
                 return
 
+            # simulam mai intai mutarea
             piesa_de_mutat = self.logic_board.board[old_row][old_col]
+            piesa_destinatie = self.logic_board.board[row][col]
+
+            self.logic_board.board[row][col] = piesa_de_mutat
+            self.logic_board.board[old_row][old_col] = ""
+
+            # verific daca nu am intrat in sah dupa mutare
+            if self.logic_board.esteSah(self.assigned_color):
+                # facem undo
+                self.logic_board.board[row][col] = piesa_destinatie
+                self.logic_board.board[old_row][old_col] = piesa_de_mutat
+
+                self.updateBoardUI()
+                rand_rege, col_rege = self.logic_board.getKingPos(self.assigned_color)
+                self.buttons[rand_rege][col_rege].setStyleSheet(self.buttons[rand_rege][col_rege].styleSheet() + "border: 4px solid red;")
+                return
+
             print(f"DEBUG: Mut piesa '{piesa_de_mutat}' de la {old_row},{old_col} la {row},{col}")
 
             self.logic_board.board[row][col] = piesa_de_mutat

@@ -150,4 +150,20 @@ class Board:
                         return True
                 return False
 
+    def getKingPos(self, culoare):
+        for i in range(8):
+            for j in range(8):
+                if self.board[i][j] == f"{culoare}K":
+                    return i,j
+
+    def esteSah(self, culoare):
+        rand_rege, col_rege = self.getKingPos(culoare)
+
+        for i in range(8):
+            for j in range(8):
+                piesa = self.board[i][j]
+                if piesa != "" and not piesa.startswith(culoare):
+                    if self.esteMutareValida(i, j, rand_rege, col_rege):
+                        return True
+        return False
 
